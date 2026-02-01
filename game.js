@@ -29,28 +29,26 @@ const textSamples = [
 let timer;
 let timeLeft = 60;
 let isGameActive = false;
-let currentText = "";
 let startTime;
 let endTime;
 let totalKeystrokes = 0;
 let correctKeystrokes = 0;
 let textQueue = [];
 let linesCompleted = 0;
+let currentLineIndex = 0;
+let lineInputs = [];
 
 // DOM elements
 const timeElement = document.getElementById("time");
 const wpmElement = document.getElementById("wpm");
 const accuracyElement = document.getElementById("accuracy");
 const typingContainer = document.getElementById("typing-container");
-const typingText = document.getElementById("typing-text");
-const typingCursor = document.querySelector(".typing-cursor");
 const restartBtn = document.getElementById("restart-btn");
 const timeSelect = document.getElementById("time-select");
-const inputField = document.getElementById("input-field");
+const inputField = document.getElementById("input-field"); // Kept for compatibility
 
-// Typing variables
-let currentPosition = 0;
-let typedText = "";
+// Keep track of used sentences to avoid repetition
+let usedSentences = new Set();
 
 // Initialize the game
 function initGame() {
@@ -63,37 +61,25 @@ function initGame() {
     totalKeystrokes = 0;
     correctKeystrokes = 0;
     linesCompleted = 0;
+    currentLineIndex = 0;
+    lineInputs = [];
     textQueue = []; // Reset text queue to get fresh sentences
     usedSentences.clear(); // Reset used sentences tracking
-    
-    // Reset the stored keystroke counts
-    window.previousTotalKeystrokes = 0;
-    window.previousCorrectKeystrokes = 0;
     
     // Update UI
     timeElement.textContent = timeLeft;
     wpmElement.textContent = "0";
     accuracyElement.textContent = "100";
     
-    // Generate new text
-    generateNewText();
+    // Clear typing container
+    typingContainer.innerHTML = "";
     
-    // Reset typing position
-    currentPosition = 0;
-    typedText = "";
-    
-    // Reset and focus the input field
-    inputField.value = "";
-    inputField.disabled = false;
-    inputField.focus();
-    updateCursorPosition();
+    // Generate new text lines
+    generateTextLines();
 }
 
-// Keep track of used sentences to avoid repetition
-let usedSentences = new Set();
-
-// Generate new text for typing
-function generateNewText() {
+// Generate text lines with input fields
+function generateTextLines() {
     // Initialize text queue if empty
     if (textQueue.length === 0) {
         // Split each sample into sentences
@@ -126,38 +112,159 @@ function generateNewText() {
         });
     }
     
-    // Get 3 sentences for display (or fewer if queue is smaller)
+    // Clear existing lines
+    typingContainer.innerHTML = "";
+    lineInputs = [];
+    
+    // Create 3 lines (or fewer if queue is smaller)
     const linesToShow = Math.min(3, textQueue.length);
-    currentText = textQueue.slice(0, linesToShow).join(" ");
     
-    // Display text with character spans for tracking
-    typingText.innerHTML = "";
-    currentText.split("").forEach(char => {
-        const charSpan = document.createElement("span");
-        charSpan.textContent = char;
-        typingText.appendChild(charSpan);
-    });
+    // If no lines available, show a prompt
+    if (linesToShow === 0) {
+        const promptElement = document.createElement("div");
+        promptElement.className = "typing-prompt";
+        promptElement.textContent = "No more text available. Click restart to begin again.";
+        typingContainer.appendChild(promptElement);
+        return;
+    }
     
-    // Position cursor at the beginning
-    updateCursorPosition();
+    // Create each line with its input field
+    for (let i = 0; i < linesToShow; i++) {
+        const lineText = textQueue[i];
+        createLineWithInput(lineText, i);
+    }
+    
+    // Focus the first input
+    if (lineInputs.length > 0) {
+        lineInputs[0].focus();
+        lineInputs[0].classList.add("active");
+    }
 }
 
-// Update cursor position
-function updateCursorPosition() {
-    const spans = typingText.querySelectorAll("span");
+// Create a line container with text display and input field
+function createLineWithInput(text, index) {
+    // Create container for this line
+    const lineContainer = document.createElement("div");
+    lineContainer.className = "typing-line-container";
+    lineContainer.id = `line-container-${index}`;
     
-    if (currentPosition < spans.length) {
-        const currentSpan = spans[currentPosition];
-        const rect = currentSpan.getBoundingClientRect();
-        const containerRect = typingContainer.getBoundingClientRect();
+    // Create text display element
+    const textDisplay = document.createElement("div");
+    textDisplay.className = "typing-text";
+    textDisplay.id = `typing-text-${index}`;
+    
+    // Add character spans for tracking
+    text.split("").forEach(char => {
+        const charSpan = document.createElement("span");
+        charSpan.textContent = char;
+        textDisplay.appendChild(charSpan);
+    });
+    
+    // Create input field for this line
+    const inputElement = document.createElement("input");
+    inputElement.type = "text";
+    inputElement.className = "typing-input";
+    inputElement.id = `typing-input-${index}`;
+    // Only add placeholder text for the first input field
+    if (index === 0) {
+        inputElement.placeholder = "Start typing here";
+    }
+    inputElement.autocomplete = "off";
+    
+    // Add input event listener
+    inputElement.addEventListener("input", () => {
+        if (!isGameActive && inputElement.value.length > 0) {
+            startTimer();
+        }
         
-        // Add a small offset to prevent cutting off the first character
-        typingCursor.style.left = (currentSpan.offsetLeft) + "px";
-        typingCursor.style.top = (currentSpan.offsetTop) + "px";
+        checkLineInput(index);
+    });
+    
+    // Add elements to container
+    lineContainer.appendChild(textDisplay);
+    lineContainer.appendChild(inputElement);
+    
+    // Add to typing container
+    typingContainer.appendChild(lineContainer);
+    
+    // Store reference to input
+    lineInputs.push(inputElement);
+}
+
+// Check input for a specific line
+function checkLineInput(lineIndex) {
+    const inputElement = lineInputs[lineIndex];
+    const textDisplay = document.getElementById(`typing-text-${lineIndex}`);
+    const spans = textDisplay.querySelectorAll("span");
+    const inputText = inputElement.value;
+    
+    // Reset all spans
+    spans.forEach(span => {
+        span.className = "";
+    });
+    
+    // Track correct keystrokes for this line
+    let correctCount = 0;
+    
+    // Compare each character
+    for (let i = 0; i < inputText.length; i++) {
+        if (i >= spans.length) break;
         
-        // Scroll if needed
-        if (currentSpan.offsetTop > typingContainer.clientHeight - 50) {
-            typingContainer.scrollTop = typingText.offsetHeight - typingContainer.clientHeight + 50;
+        if (inputText[i] === spans[i].textContent) {
+            spans[i].classList.add("correct");
+            correctCount++;
+        } else {
+            spans[i].classList.add("incorrect");
+        }
+    }
+    
+    // Mark current position
+    if (inputText.length < spans.length) {
+        spans[inputText.length].classList.add("current");
+    }
+    
+    // Update total keystrokes and correct keystrokes
+    totalKeystrokes = lineIndex > 0 ?
+        lineInputs.slice(0, lineIndex).reduce((sum, input) => sum + input.value.length, 0) + inputText.length :
+        inputText.length;
+    
+    correctKeystrokes = lineIndex > 0 ?
+        lineInputs.slice(0, lineIndex).reduce((sum, input, idx) => {
+            const textSpans = document.getElementById(`typing-text-${idx}`).querySelectorAll("span");
+            let correct = 0;
+            for (let i = 0; i < input.value.length && i < textSpans.length; i++) {
+                if (input.value[i] === textSpans[i].textContent) correct++;
+            }
+            return sum + correct;
+        }, 0) + correctCount :
+        correctCount;
+    
+    // Update metrics
+    updateMetrics();
+    
+    // Check if line is completed correctly
+    if (inputText.length === spans.length) {
+        const allCorrect = correctCount === spans.length;
+        if (allCorrect) {
+            // Mark as completed
+            inputElement.classList.add("completed");
+            inputElement.disabled = true;
+            
+            // Move to next line if available
+            if (lineIndex < lineInputs.length - 1) {
+                lineInputs[lineIndex + 1].classList.add("active");
+                lineInputs[lineIndex + 1].focus();
+                currentLineIndex = lineIndex + 1;
+            } else {
+                // All lines completed, add more lines
+                linesCompleted += lineInputs.length;
+                
+                // Remove completed lines from queue
+                textQueue.splice(0, lineInputs.length);
+                
+                // Generate new lines
+                generateTextLines();
+            }
         }
     }
 }
@@ -182,9 +289,16 @@ function calculateWPM() {
     // Count completed lines as words (average 10 words per line)
     const completedWords = linesCompleted * 10;
     
-    // Add current progress
-    const currentText = inputField.value;
-    const currentWords = currentText.length / 5;
+    // Add current progress from active inputs
+    let currentInputChars = 0;
+    lineInputs.forEach(input => {
+        if (!input.disabled) {
+            currentInputChars += input.value.length;
+        }
+    });
+    
+    // Convert characters to words (standard: 5 chars = 1 word)
+    const currentWords = currentInputChars / 5;
     
     // Calculate total words
     const totalWords = completedWords + currentWords;
@@ -212,45 +326,16 @@ function updateMetrics() {
     accuracyElement.textContent = accuracy;
 }
 
-// Add new text when current text is completed
-function addNewText() {
-    // Save current metrics
-    const currentWPM = calculateWPM();
-    const currentAccuracy = calculateAccuracy();
-    
-    // Store the current keystroke counts before resetting
-    const previousTotal = totalKeystrokes;
-    const previousCorrect = correctKeystrokes;
-    
-    // Remove the first sentence from the queue
-    textQueue.shift();
-    linesCompleted++;
-    
-    // Reset input
-    inputField.value = "";
-    
-    // Generate new text (this will add more text from the queue)
-    generateNewText();
-    
-    // Reset typing position but keep the timer running
-    currentPosition = 0;
-    typedText = "";
-    
-    // Focus the input field
-    inputField.focus();
-    
-    // Preserve the keystroke counts across text segments
-    // We'll restore these values in checkInput
-    window.previousTotalKeystrokes = previousTotal;
-    window.previousCorrectKeystrokes = previousCorrect;
-}
-
 // End the game and save results
 function endGame() {
     clearInterval(timer);
     isGameActive = false;
     endTime = new Date();
-    inputField.disabled = true;
+    
+    // Disable all input fields
+    lineInputs.forEach(input => {
+        input.disabled = true;
+    });
     
     // Get the total test duration
     const totalTime = parseInt(timeSelect.value);
@@ -274,70 +359,7 @@ function endGame() {
     }, 1000);
 }
 
-// Check user input against the text
-function checkInput() {
-    const inputText = inputField.value;
-    const textSpans = typingText.querySelectorAll("span");
-    
-    // Reset all spans
-    textSpans.forEach(span => {
-        span.className = "";
-    });
-    
-    // Initialize window.previousTotalKeystrokes and window.previousCorrectKeystrokes if they don't exist
-    if (typeof window.previousTotalKeystrokes === 'undefined') {
-        window.previousTotalKeystrokes = 0;
-        window.previousCorrectKeystrokes = 0;
-    }
-    
-    // Track correct and incorrect keystrokes
-    // Count the actual number of keystrokes, including previous segments
-    totalKeystrokes = window.previousTotalKeystrokes + inputText.length;
-    let currentCorrect = 0;
-    
-    // Compare each character independently
-    for (let i = 0; i < inputText.length; i++) {
-        if (i >= textSpans.length) break;
-        
-        if (inputText[i] === textSpans[i].textContent) {
-            textSpans[i].classList.add("correct");
-            currentCorrect++;
-        } else {
-            textSpans[i].classList.add("incorrect");
-        }
-    }
-    
-    // Update total correct keystrokes with actual count, including previous segments
-    correctKeystrokes = window.previousCorrectKeystrokes + currentCorrect;
-    
-    // Mark current position
-    if (inputText.length < textSpans.length) {
-        textSpans[inputText.length].classList.add("current");
-    }
-    
-    // Update metrics
-    updateMetrics();
-    
-    // Check if first sentence is completed
-    if (inputText.length === textSpans.length) {
-        // Check if all characters are correct for the first sentence
-        const allCorrect = currentCorrect === textSpans.length;
-        if (allCorrect) {
-            // Add new text instead of ending the game
-            addNewText();
-        }
-    }
-}
-
-// Event listeners
-inputField.addEventListener("input", () => {
-    if (!isGameActive && inputField.value.length > 0) {
-        startTimer();
-    }
-    
-    checkInput();
-});
-
+// Restart button event listener
 restartBtn.addEventListener("click", () => {
     clearInterval(timer);
     initGame();
@@ -350,11 +372,6 @@ timeSelect.addEventListener("change", () => {
         timeLeft = selectedTime;
         timeElement.textContent = timeLeft;
     }
-});
-
-// Focus input field when typing container is clicked
-typingContainer.addEventListener("click", () => {
-    inputField.focus();
 });
 
 // Initialize game on page load
