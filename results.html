@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Test Results</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container results-container">
+        <h1>Your Results</h1>
+        <div class="results">
+            <div class="result-card">
+                <h2>Words Per Minute</h2>
+                <div class="result-value" id="result-wpm">0</div>
+            </div>
+            <div class="result-card">
+                <h2>Accuracy</h2>
+                <div class="result-value" id="result-accuracy">0%</div>
+            </div>
+            <div class="result-card">
+                <h2>Time</h2>
+                <div class="result-value" id="result-time">0s</div>
+                <div class="result-subtext" id="test-duration">of 0s test</div>
+            </div>
+        </div>
+        <div class="details">
+            <div class="detail-item">
+                <span>Characters typed:</span>
+                <span id="chars-typed">0</span>
+            </div>
+            <div class="detail-item">
+                <span>Correct characters:</span>
+                <span id="correct-chars">0</span>
+            </div>
+            <div class="detail-item">
+                <span>Incorrect characters:</span>
+                <span id="incorrect-chars">0</span>
+            </div>
+        </div>
+        <div class="buttons">
+            <button id="try-again-btn">Try Again</button>
+        </div>
+    </div>
+    <script src="results.js"></script>
+</body>
+</html>
