@@ -293,74 +293,81 @@ function checkLineInput(lineIndex) {
     // Update metrics
     updateMetrics();
     
-    // Strict line completion check - require full length or more
-    // Only consider line complete when user has typed at least the full length
-    const hasTypedFullLength = inputText.length >= spans.length;
+    // Word-based completion check with last word verification
+    // Basic check: have we typed at least as many words as the target?
+    const hasTypedAllWords = inputWords.length >= targetWords.length;
     
-    // Debug log to help diagnose issues
-    console.log(`Line check: length=${inputText.length}/${spans.length}, words=${inputWords.length}/${targetWords.length}`);
+    // Last word check: is the last word fully typed?
+    let isLastWordComplete = false;
     
-    if (hasTypedFullLength && inputText.length > 0) {
-        // Allow completion with a reasonable error rate
-        const errorRate = errorCount / spans.length;
-        console.log(`Error rate: ${errorRate}, errors: ${errorCount}, total: ${spans.length}`);
+    // Define these variables outside the if statement so they're available for logging
+    const lastInputWord = inputWords.length > 0 ? inputWords[inputWords.length - 1] : "";
+    const lastTargetWord = targetWords.length > 0 ? targetWords[targetWords.length - 1] : "";
+    
+    if (inputWords.length > 0 && targetWords.length > 0) {
+        // Check if the last word is at least as long as the target last word
+        // This ensures we've typed the full last word
+        isLastWordComplete = lastInputWord.length >= lastTargetWord.length;
+    }
+
         
-        if (errorRate <= 0.15) { // Allow 15% error rate for completion
-            // Mark as completed
-            inputElement.classList.add("completed");
-            inputElement.disabled = true;
+    // Only complete if we've typed all words AND the last word is complete
+    if (hasTypedAllWords && isLastWordComplete && inputText.length > 0) {
+        // Move to next line only when last word is fully typed
+        
+        // Mark as completed
+        inputElement.classList.add("completed");
+        inputElement.disabled = true;
+        
+        // Line completed, increment counter
+        linesCompleted++;
+        
+        // Remove completed line from queue
+        textQueue.shift();
+        
+        // If there are more lines in the queue, add a new line at the bottom
+        if (textQueue.length >= lineInputs.length) {
+            // Create a new line at the bottom
+            createLineWithInput(textQueue[lineInputs.length], lineInputs.length);
             
-            // Line completed, increment counter
-            linesCompleted++;
-            
-            // Remove completed line from queue
-            textQueue.shift();
-            
-            // If there are more lines in the queue, add a new line at the bottom
-            if (textQueue.length >= lineInputs.length) {
-                // Create a new line at the bottom
-                createLineWithInput(textQueue[lineInputs.length], lineInputs.length);
+            // Always focus the next input (which should be at index lineIndex + 1)
+            if (lineIndex + 1 < lineInputs.length) {
+                // Remove active class from all inputs
+                lineInputs.forEach(input => input.classList.remove("active"));
                 
-                // Always focus the next input (which should be at index lineIndex + 1)
-                if (lineIndex + 1 < lineInputs.length) {
-                    // Remove active class from all inputs
-                    lineInputs.forEach(input => input.classList.remove("active"));
-                    
-                    // Add active class to next input
-                    lineInputs[lineIndex + 1].classList.add("active");
-                    
-                    // Focus the next input - use a more reliable approach
-                    setTimeout(() => {
-                        try {
-                            // Force blur first
-                            inputElement.blur();
-                            
-                            // Then focus the next input
-                            lineInputs[lineIndex + 1].focus();
-                            
-                            // Scroll to show the next line
-                            const nextLineContainer = document.getElementById(`line-container-${lineIndex + 1}`);
-                            if (nextLineContainer) {
-                                nextLineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                            
-                            console.log("Focus moved to next line");
-                        } catch (e) {
-                            console.error("Error moving focus:", e);
-                        }
-                    }, 100); // Longer delay to ensure DOM is updated
-                }
-            } else {
-                // No more lines in the queue, generate new lines
-                generateTextLines();
+                // Add active class to next input
+                lineInputs[lineIndex + 1].classList.add("active");
                 
-                // Focus the first input of the new lines
+                // Focus the next input - use a more reliable approach
                 setTimeout(() => {
-                    if (lineInputs.length > 0) {
-                        lineInputs[0].focus();
+                    try {
+                        // Force blur first
+                        inputElement.blur();
+                        
+                        // Then focus the next input
+                        lineInputs[lineIndex + 1].focus();
+                        
+                        // Scroll to show the next line
+                        const nextLineContainer = document.getElementById(`line-container-${lineIndex + 1}`);
+                        if (nextLineContainer) {
+                            nextLineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                        
+                    } catch (e) {
+                        console.error("Error moving focus:", e);
                     }
-                }, 50);
+                }, 100); // Longer delay to ensure DOM is updated
             }
+        } else {
+            // No more lines in the queue, generate new lines
+            generateTextLines();
+            
+            // Focus the first input of the new lines
+            setTimeout(() => {
+                if (lineInputs.length > 0) {
+                    lineInputs[0].focus();
+                }
+            }, 50);
         }
     }
 }
