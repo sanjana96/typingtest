@@ -78,7 +78,7 @@ function initGame() {
     generateTextLines();
 }
 
-// Generate text lines with input fields
+// Generate text lines with input fields - showing two lines at a time
 function generateTextLines() {
     // Initialize text queue if empty
     if (textQueue.length === 0) {
@@ -116,11 +116,8 @@ function generateTextLines() {
     typingContainer.innerHTML = "";
     lineInputs = [];
     
-    // Create 3 lines (or fewer if queue is smaller)
-    const linesToShow = Math.min(3, textQueue.length);
-    
     // If no lines available, show a prompt
-    if (linesToShow === 0) {
+    if (textQueue.length === 0) {
         const promptElement = document.createElement("div");
         promptElement.className = "typing-prompt";
         promptElement.textContent = "No more text available. Click restart to begin again.";
@@ -128,10 +125,10 @@ function generateTextLines() {
         return;
     }
     
-    // Create each line with its input field
+    // Create two lines (or one if only one is available)
+    const linesToShow = Math.min(2, textQueue.length);
     for (let i = 0; i < linesToShow; i++) {
-        const lineText = textQueue[i];
-        createLineWithInput(lineText, i);
+        createLineWithInput(textQueue[i], i);
     }
     
     // Focus the first input
@@ -191,7 +188,7 @@ function createLineWithInput(text, index) {
     lineInputs.push(inputElement);
 }
 
-// Check input for a specific line
+// Check input for a specific line with simpler validation
 function checkLineInput(lineIndex) {
     const inputElement = lineInputs[lineIndex];
     const textDisplay = document.getElementById(`typing-text-${lineIndex}`);
@@ -203,24 +200,26 @@ function checkLineInput(lineIndex) {
         span.className = "";
     });
     
-    // Track correct keystrokes for this line
+    // Track correct keystrokes and errors for this line
     let correctCount = 0;
+    let errorCount = 0;
     
-    // Compare each character
+    // Simple character-by-character comparison
     for (let i = 0; i < inputText.length; i++) {
-        if (i >= spans.length) break;
-        
-        if (inputText[i] === spans[i].textContent) {
-            spans[i].classList.add("correct");
-            correctCount++;
-        } else {
-            spans[i].classList.add("incorrect");
+        if (i < spans.length) {
+            if (inputText[i] === spans[i].textContent) {
+                spans[i].classList.add("correct");
+                correctCount++;
+            } else {
+                spans[i].classList.add("incorrect");
+                errorCount++;
+            }
         }
     }
     
     // Mark current position
     if (inputText.length < spans.length) {
-        spans[inputText.length].classList.add("current");
+        spans[Math.min(inputText.length, spans.length - 1)].classList.add("current");
     }
     
     // Update total keystrokes and correct keystrokes
@@ -230,11 +229,17 @@ function checkLineInput(lineIndex) {
     
     correctKeystrokes = lineIndex > 0 ?
         lineInputs.slice(0, lineIndex).reduce((sum, input, idx) => {
+            // Simple character matching for previous lines
             const textSpans = document.getElementById(`typing-text-${idx}`).querySelectorAll("span");
+            const lineInputText = input.value;
+            
             let correct = 0;
-            for (let i = 0; i < input.value.length && i < textSpans.length; i++) {
-                if (input.value[i] === textSpans[i].textContent) correct++;
+            for (let i = 0; i < lineInputText.length && i < textSpans.length; i++) {
+                if (lineInputText[i] === textSpans[i].textContent) {
+                    correct++;
+                }
             }
+            
             return sum + correct;
         }, 0) + correctCount :
         correctCount;
@@ -242,28 +247,55 @@ function checkLineInput(lineIndex) {
     // Update metrics
     updateMetrics();
     
-    // Check if line is completed correctly
+    // Check if line is completed correctly - require exact length match
     if (inputText.length === spans.length) {
-        const allCorrect = correctCount === spans.length;
-        if (allCorrect) {
+        // Allow completion with a reasonable error rate
+        const errorRate = errorCount / spans.length;
+        if (errorRate <= 0.1) { // Allow 10% error rate for completion
             // Mark as completed
             inputElement.classList.add("completed");
             inputElement.disabled = true;
             
-            // Move to next line if available
-            if (lineIndex < lineInputs.length - 1) {
-                lineInputs[lineIndex + 1].classList.add("active");
-                lineInputs[lineIndex + 1].focus();
-                currentLineIndex = lineIndex + 1;
+            // Line completed, increment counter
+            linesCompleted++;
+            
+            // Remove completed line from queue
+            textQueue.shift();
+            
+            // If there are more lines in the queue, add a new line at the bottom
+            if (textQueue.length >= lineInputs.length) {
+                // Create a new line at the bottom
+                createLineWithInput(textQueue[lineInputs.length], lineInputs.length);
+                
+                // Always focus the next input (which should be at index lineIndex + 1)
+                if (lineIndex + 1 < lineInputs.length) {
+                    // Remove active class from all inputs
+                    lineInputs.forEach(input => input.classList.remove("active"));
+                    
+                    // Add active class to next input
+                    lineInputs[lineIndex + 1].classList.add("active");
+                    
+                    // Focus the next input
+                    setTimeout(() => {
+                        lineInputs[lineIndex + 1].focus();
+                        
+                        // Scroll to show the next line
+                        const nextLineContainer = document.getElementById(`line-container-${lineIndex + 1}`);
+                        if (nextLineContainer) {
+                            nextLineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 50); // Small delay to ensure DOM is updated
+                }
             } else {
-                // All lines completed, add more lines
-                linesCompleted += lineInputs.length;
-                
-                // Remove completed lines from queue
-                textQueue.splice(0, lineInputs.length);
-                
-                // Generate new lines
+                // No more lines in the queue, generate new lines
                 generateTextLines();
+                
+                // Focus the first input of the new lines
+                setTimeout(() => {
+                    if (lineInputs.length > 0) {
+                        lineInputs[0].focus();
+                    }
+                }, 50);
             }
         }
     }
