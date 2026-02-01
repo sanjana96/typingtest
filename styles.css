@@ -123,11 +123,15 @@ button:hover {
     min-height: 200px;
     padding: 1rem 2rem;
     overflow: hidden;
-    cursor: text;
 }
 
 .typing-container:focus {
     outline: none;
+}
+
+.typing-line-container {
+    margin-bottom: 2.5rem;
+    position: relative;
 }
 
 .typing-text {
@@ -140,8 +144,37 @@ button:hover {
     max-width: 100%;
     display: inline-block;
     letter-spacing: 0.5px;
-    padding-left: 0;
-    margin-left: 0;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+}
+
+.typing-input {
+    width: 100%;
+    padding: 0.5rem 0;
+    font-size: 1.8rem;
+    line-height: 1.8;
+    background-color: transparent;
+    color: #e0e0e0;
+    border: none;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+}
+
+.typing-input:focus {
+    outline: none;
+}
+
+.typing-input::placeholder {
+    color: #888;
+    opacity: 0.7;
+}
+
+.typing-input.completed {
+    color: #a3be8c;
+}
+
+.typing-input.active {
+    color: #81a1c1;
 }
 
 .typing-text span {
@@ -163,27 +196,27 @@ button:hover {
     border-bottom: 1px solid #d08770;
 }
 
-.typing-cursor {
-    position: absolute;
-    display: inline-block;
-    width: 1px;
-    height: 1.8rem;
-    background-color: #81a1c1;
-    animation: blink 1s infinite;
-}
-
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
 }
 
-/* Hidden input field for typing */
+/* Hidden input field for typing (kept for compatibility) */
 .hidden-input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
     width: 0;
     height: 0;
+}
+
+/* Prompt text for empty state */
+.typing-prompt {
+    text-align: center;
+    color: #888;
+    font-size: 1.5rem;
+    font-style: italic;
+    margin: 2rem 0;
 }
 
 /* Results Page Styles */
