@@ -1,29 +1,5 @@
-// Sample text passages for typing practice
-const textSamples = [
-    // Interesting quotes
-    "Be yourself; everyone else is already taken. Oscar Wilde's famous quote reminds us of the value of authenticity in a world that often encourages conformity.",
-    "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. Einstein's humorous observation continues to resonate with people who observe human behavior.",
-    "The only way to do great work is to love what you do. If you haven't found it yet, keep looking. Don't settle. Steve Jobs delivered this advice in his famous Stanford commencement speech.",
-    "In three words I can sum up everything I've learned about life: it goes on. Robert Frost's simple yet profound observation captures the relentless forward movement of time.",
-    
-    // Fascinating facts
-    "Octopuses have three hearts, nine brains, and blue blood. Their sophisticated nervous system allows them to solve complex puzzles and even use tools, making them among the most intelligent invertebrates.",
-    "The Great Barrier Reef is the largest living structure on Earth, stretching over 1,400 miles. It's so massive that it can be seen from outer space and contains thousands of individual reef systems.",
-    "A day on Venus is longer than a year on Venus. Due to its slow rotation, Venus takes 243 Earth days to complete one rotation, but only 225 Earth days to orbit the Sun.",
-    "The human brain processes images in just 13 milliseconds, making visual processing far faster than previously believed. This remarkable speed allows us to make split-second decisions based on what we see.",
-    
-    // Interesting passages
-    "The ancient Library of Alexandria was one of the largest and most significant libraries of the ancient world. Founded in the 3rd century BCE, it functioned as a major center of scholarship and contained works by the greatest thinkers and writers of the ancient world.",
-    "The first computer programmer was a woman named Ada Lovelace, who wrote the first algorithm designed to be processed by a machine in the mid-1800s. Her notes on Charles Babbage's Analytical Engine include what is recognized as the first computer program.",
-    "The world's oldest known living tree is a Great Basin bristlecone pine named Methuselah, estimated to be over 4,850 years old. It was already ancient when the pyramids were being built in Egypt.",
-    "The human body contains approximately 60,000 miles of blood vessels. If laid end to end, they would circle the Earth nearly two and a half times, demonstrating the incredible complexity of our circulatory system.",
-    
-    // Technology insights
-    "Quantum computing harnesses the strange properties of quantum physics to process information in ways that classical computers cannot. Instead of using bits that are either 0 or 1, quantum computers use qubits that can exist in multiple states simultaneously.",
-    "Blockchain technology creates a decentralized and immutable ledger that records transactions across many computers. This design makes the history of any digital asset transparent and verifiable without requiring a trusted third party.",
-    "Machine learning algorithms improve automatically through experience, allowing computers to find insights without being explicitly programmed where to look. This capability powers many modern technologies from recommendation systems to autonomous vehicles.",
-    "The Internet of Things refers to the billions of physical devices around the world that are connected to the internet, collecting and sharing data. This massive network is transforming how we live and work by making our environment smarter and more responsive."
-];
+// Track which samples have been used
+let usedSampleIndices = [];
 
 // Game variables
 let timer;
@@ -47,8 +23,6 @@ const restartBtn = document.getElementById("restart-btn");
 const timeSelect = document.getElementById("time-select");
 const inputField = document.getElementById("input-field"); // Kept for compatibility
 
-// Keep track of used sentences to avoid repetition
-let usedSentences = new Set();
 
 // Initialize the game
 function initGame() {
@@ -64,7 +38,8 @@ function initGame() {
     currentLineIndex = 0;
     lineInputs = [];
     textQueue = []; // Reset text queue to get fresh sentences
-    usedSentences.clear(); // Reset used sentences tracking
+    
+    // Don't reset usedSampleIndices here to ensure we cycle through all samples
     
     // Update UI
     timeElement.textContent = timeLeft;
@@ -78,38 +53,42 @@ function initGame() {
     generateTextLines();
 }
 
+// Function to get the next random text sample
+function getNextTextSample() {
+    // If all samples have been used, reset the used indices
+    if (usedSampleIndices.length === textSamples.length) {
+        usedSampleIndices = [];
+    }
+    
+    // Get available sample indices
+    const availableIndices = textSamples.map((_, index) => index)
+        .filter(index => !usedSampleIndices.includes(index));
+    
+    // Pick a random index from available indices
+    const randomIndex = Math.floor(Math.random() * availableIndices.length);
+    const selectedIndex = availableIndices[randomIndex];
+    
+    // Mark this index as used
+    usedSampleIndices.push(selectedIndex);
+    
+    // Return the selected sample
+    return textSamples[selectedIndex];
+}
+
 // Generate text lines with input fields - showing two lines at a time
 function generateTextLines() {
     // Initialize text queue if empty
     if (textQueue.length === 0) {
-        // Split each sample into sentences
-        const allSentences = [];
-        textSamples.forEach(sample => {
-            // Split by periods, question marks, and exclamation points
-            const sentences = sample.match(/[^.!?]+[.!?]+/g) || [sample];
-            allSentences.push(...sentences);
-        });
+        // Get a random text sample
+        const sample = getNextTextSample();
         
-        // Filter out previously used sentences
-        const availableSentences = allSentences.filter(sentence => !usedSentences.has(sentence.trim()));
+        // Split the sample into sentences
+        const sentences = sample.match(/[^.!?]+[.!?]+/g) || [sample];
         
-        // If we've used most sentences, reset the used set
-        if (availableSentences.length < 10) {
-            usedSentences.clear();
-        }
+        // Add sentences to the queue
+        textQueue = sentences.map(sentence => sentence.trim());
         
-        // Shuffle sentences
-        for (let i = availableSentences.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [availableSentences[i], availableSentences[j]] = [availableSentences[j], availableSentences[i]];
-        }
-        
-        // Add to queue and mark as used
-        textQueue = availableSentences.map(sentence => {
-            const trimmed = sentence.trim();
-            usedSentences.add(trimmed);
-            return trimmed;
-        });
+        console.log("New text sample selected:", sample.substring(0, 50) + "...");
     }
     
     // Clear existing lines
@@ -188,12 +167,15 @@ function createLineWithInput(text, index) {
     lineInputs.push(inputElement);
 }
 
-// Check input for a specific line with simpler validation
+// Check input for a specific line with word-based validation
 function checkLineInput(lineIndex) {
     const inputElement = lineInputs[lineIndex];
     const textDisplay = document.getElementById(`typing-text-${lineIndex}`);
     const spans = textDisplay.querySelectorAll("span");
     const inputText = inputElement.value;
+    
+    // Get the target text
+    const targetText = Array.from(spans).map(span => span.textContent).join('');
     
     // Reset all spans
     spans.forEach(span => {
@@ -204,22 +186,64 @@ function checkLineInput(lineIndex) {
     let correctCount = 0;
     let errorCount = 0;
     
-    // Simple character-by-character comparison
-    for (let i = 0; i < inputText.length; i++) {
-        if (i < spans.length) {
-            if (inputText[i] === spans[i].textContent) {
-                spans[i].classList.add("correct");
+    // Split text into words and track positions
+    const targetWords = targetText.split(' ');
+    const inputWords = inputText.split(' ');
+    
+    let targetCharIndex = 0;
+    let inputCharIndex = 0;
+    
+    // Process each word
+    for (let wordIndex = 0; wordIndex < Math.min(targetWords.length, inputWords.length); wordIndex++) {
+        const targetWord = targetWords[wordIndex];
+        const inputWord = inputWords[wordIndex];
+        
+        // Compare characters within this word
+        for (let charIndex = 0; charIndex < Math.max(targetWord.length, inputWord.length); charIndex++) {
+            if (charIndex < targetWord.length && charIndex < inputWord.length) {
+                // Both target and input have this character
+                if (targetWord[charIndex] === inputWord[charIndex]) {
+                    if (targetCharIndex + charIndex < spans.length) {
+                        spans[targetCharIndex + charIndex].classList.add("correct");
+                        correctCount++;
+                    }
+                } else {
+                    if (targetCharIndex + charIndex < spans.length) {
+                        spans[targetCharIndex + charIndex].classList.add("incorrect");
+                        errorCount++;
+                    }
+                }
+            } else if (charIndex < targetWord.length) {
+                // Missing character in input
+                if (targetCharIndex + charIndex < spans.length) {
+                    spans[targetCharIndex + charIndex].classList.add("current");
+                }
+            } else {
+                // Extra character in input - no span to mark
+                errorCount++;
+            }
+        }
+        
+        // Move indices past this word and the following space
+        targetCharIndex += targetWord.length + 1; // +1 for space
+        inputCharIndex += inputWord.length + 1;  // +1 for space
+        
+        // Mark the space after the word if it exists
+        if (wordIndex < targetWords.length - 1 && targetCharIndex - 1 < spans.length) {
+            if (wordIndex < inputWords.length - 1) {
+                // Space exists in both target and input
+                spans[targetCharIndex - 1].classList.add("correct");
                 correctCount++;
             } else {
-                spans[i].classList.add("incorrect");
-                errorCount++;
+                // Space missing in input
+                spans[targetCharIndex - 1].classList.add("current");
             }
         }
     }
     
-    // Mark current position
-    if (inputText.length < spans.length) {
-        spans[Math.min(inputText.length, spans.length - 1)].classList.add("current");
+    // Mark current position if not at the end
+    if (inputText.length < targetText.length && inputText.length < spans.length) {
+        spans[inputText.length].classList.add("current");
     }
     
     // Update total keystrokes and correct keystrokes
@@ -229,13 +253,35 @@ function checkLineInput(lineIndex) {
     
     correctKeystrokes = lineIndex > 0 ?
         lineInputs.slice(0, lineIndex).reduce((sum, input, idx) => {
-            // Simple character matching for previous lines
-            const textSpans = document.getElementById(`typing-text-${idx}`).querySelectorAll("span");
+            // Word-based matching for previous lines
+            const textDisplay = document.getElementById(`typing-text-${idx}`);
+            if (!textDisplay) return sum;
+            
+            const spans = textDisplay.querySelectorAll("span");
+            const targetText = Array.from(spans).map(span => span.textContent).join('');
             const lineInputText = input.value;
             
+            // Split into words
+            const targetWords = targetText.split(' ');
+            const inputWords = lineInputText.split(' ');
+            
             let correct = 0;
-            for (let i = 0; i < lineInputText.length && i < textSpans.length; i++) {
-                if (lineInputText[i] === textSpans[i].textContent) {
+            let targetCharIndex = 0;
+            
+            // Process each word
+            for (let wordIndex = 0; wordIndex < Math.min(targetWords.length, inputWords.length); wordIndex++) {
+                const targetWord = targetWords[wordIndex];
+                const inputWord = inputWords[wordIndex];
+                
+                // Compare characters within this word
+                for (let charIndex = 0; charIndex < Math.min(targetWord.length, inputWord.length); charIndex++) {
+                    if (targetWord[charIndex] === inputWord[charIndex]) {
+                        correct++;
+                    }
+                }
+                
+                // Count space after word if not the last word
+                if (wordIndex < targetWords.length - 1 && wordIndex < inputWords.length - 1) {
                     correct++;
                 }
             }
@@ -247,11 +293,19 @@ function checkLineInput(lineIndex) {
     // Update metrics
     updateMetrics();
     
-    // Check if line is completed correctly - require exact length match
-    if (inputText.length === spans.length) {
+    // Strict line completion check - require full length or more
+    // Only consider line complete when user has typed at least the full length
+    const hasTypedFullLength = inputText.length >= spans.length;
+    
+    // Debug log to help diagnose issues
+    console.log(`Line check: length=${inputText.length}/${spans.length}, words=${inputWords.length}/${targetWords.length}`);
+    
+    if (hasTypedFullLength && inputText.length > 0) {
         // Allow completion with a reasonable error rate
         const errorRate = errorCount / spans.length;
-        if (errorRate <= 0.1) { // Allow 10% error rate for completion
+        console.log(`Error rate: ${errorRate}, errors: ${errorCount}, total: ${spans.length}`);
+        
+        if (errorRate <= 0.15) { // Allow 15% error rate for completion
             // Mark as completed
             inputElement.classList.add("completed");
             inputElement.disabled = true;
@@ -275,16 +329,26 @@ function checkLineInput(lineIndex) {
                     // Add active class to next input
                     lineInputs[lineIndex + 1].classList.add("active");
                     
-                    // Focus the next input
+                    // Focus the next input - use a more reliable approach
                     setTimeout(() => {
-                        lineInputs[lineIndex + 1].focus();
-                        
-                        // Scroll to show the next line
-                        const nextLineContainer = document.getElementById(`line-container-${lineIndex + 1}`);
-                        if (nextLineContainer) {
-                            nextLineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        try {
+                            // Force blur first
+                            inputElement.blur();
+                            
+                            // Then focus the next input
+                            lineInputs[lineIndex + 1].focus();
+                            
+                            // Scroll to show the next line
+                            const nextLineContainer = document.getElementById(`line-container-${lineIndex + 1}`);
+                            if (nextLineContainer) {
+                                nextLineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                            
+                            console.log("Focus moved to next line");
+                        } catch (e) {
+                            console.error("Error moving focus:", e);
                         }
-                    }, 50); // Small delay to ensure DOM is updated
+                    }, 100); // Longer delay to ensure DOM is updated
                 }
             } else {
                 // No more lines in the queue, generate new lines
