@@ -49,8 +49,39 @@ function initGame() {
     // Clear typing container
     typingContainer.innerHTML = "";
     
+    // Set optimal container height based on screen size
+    adjustContainerHeight();
+    
     // Generate new text lines
     generateTextLines();
+}
+
+// Adjust typing container height based on screen size
+function adjustContainerHeight() {
+    const typingContainer = document.getElementById("typing-container");
+    if (!typingContainer) return;
+    
+    // Get viewport height
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate optimal height (smaller on mobile)
+    let optimalHeight;
+    if (viewportHeight < 500) {
+        // Very small screens (landscape mobile)
+        optimalHeight = Math.max(150, viewportHeight * 0.3);
+    } else if (viewportHeight < 700) {
+        // Small screens (most mobiles)
+        optimalHeight = Math.max(200, viewportHeight * 0.35);
+    } else if (viewportHeight < 900) {
+        // Medium screens (tablets, small laptops)
+        optimalHeight = Math.max(250, viewportHeight * 0.4);
+    } else {
+        // Large screens
+        optimalHeight = Math.max(300, viewportHeight * 0.45);
+    }
+    
+    // Apply the height
+    typingContainer.style.height = `${Math.round(optimalHeight)}px`;
 }
 
 // Function to get the next random text sample
@@ -85,8 +116,65 @@ function generateTextLines() {
         // Split the sample into sentences
         const sentences = sample.match(/[^.!?]+[.!?]+/g) || [sample];
         
-        // Add sentences to the queue
-        textQueue = sentences.map(sentence => sentence.trim());
+        // Process sentences to fit screen width
+        const processedSentences = [];
+        sentences.forEach(sentence => {
+            const trimmed = sentence.trim();
+            
+            // Always split into smaller chunks to fit screen width
+            // Determine max length based on screen width
+            const screenWidth = window.innerWidth;
+            let maxLength;
+            
+            if (screenWidth <= 320) {
+                maxLength = 25; // Very small phones
+            } else if (screenWidth <= 480) {
+                maxLength = 35; // Small phones
+            } else if (screenWidth <= 768) {
+                maxLength = 45; // Large phones/small tablets
+            } else {
+                maxLength = 60; // Tablets and desktops
+            }
+            
+            // Split into chunks
+            if (trimmed.length > maxLength) {
+                // Find natural breaking points (commas, semicolons, etc.)
+                const breakPoints = trimmed.match(/[^,;:]+[,;:]/g);
+                
+                if (breakPoints && breakPoints.length > 1 &&
+                    breakPoints.every(chunk => chunk.length <= maxLength * 1.2)) {
+                    // Use natural breaks if they're not too long
+                    breakPoints.forEach(chunk => {
+                        processedSentences.push(chunk.trim());
+                    });
+                } else {
+                    // Otherwise split into chunks of appropriate length
+                    let start = 0;
+                    while (start < trimmed.length) {
+                        // Find a space near the maxLength mark
+                        let end = Math.min(start + maxLength, trimmed.length);
+                        if (end < trimmed.length) {
+                            // Look for a space to break at
+                            while (end > start && trimmed[end] !== ' ') {
+                                end--;
+                            }
+                            // If no space found, just use the maxLength mark
+                            if (end === start) {
+                                end = Math.min(start + maxLength, trimmed.length);
+                            }
+                        }
+                        processedSentences.push(trimmed.substring(start, end).trim());
+                        start = end;
+                    }
+                }
+            } else {
+                // For shorter sentences, keep as is
+                processedSentences.push(trimmed);
+            }
+        });
+        
+        // Add processed sentences to the queue
+        textQueue = processedSentences;
         
         console.log("New text sample selected:", sample.substring(0, 50) + "...");
     }
@@ -198,8 +286,18 @@ function checkLineInput(lineIndex) {
         const targetWord = targetWords[wordIndex];
         const inputWord = inputWords[wordIndex];
         
+        // Check if this is the last word being typed (still in progress)
+        const isLastTypedWord = wordIndex === inputWords.length - 1;
+        
         // Compare characters within this word
         for (let charIndex = 0; charIndex < Math.max(targetWord.length, inputWord.length); charIndex++) {
+            // For the last word being typed, only validate up to the number of characters typed
+            // For previous words, validate the entire word
+            if (isLastTypedWord && charIndex >= inputWord.length) {
+                // Don't validate or mark characters that haven't been typed yet in the current word
+                continue;
+            }
+            
             if (charIndex < targetWord.length && charIndex < inputWord.length) {
                 // Both target and input have this character
                 if (targetWord[charIndex] === inputWord[charIndex]) {
@@ -214,14 +312,21 @@ function checkLineInput(lineIndex) {
                     }
                 }
             } else if (charIndex < targetWord.length) {
-                // Missing character in input
-                if (targetCharIndex + charIndex < spans.length) {
-                    spans[targetCharIndex + charIndex].classList.add("current");
+                // Missing character in input (only for completed words)
+                if (!isLastTypedWord && targetCharIndex + charIndex < spans.length) {
+                    spans[targetCharIndex + charIndex].classList.add("incorrect");
+                    errorCount++;
                 }
             } else {
                 // Extra character in input - no span to mark
                 errorCount++;
             }
+        }
+        
+        // For the last word, mark the next character to be typed as "current"
+        if (isLastTypedWord && inputWord.length < targetWord.length &&
+            targetCharIndex + inputWord.length < spans.length) {
+            spans[targetCharIndex + inputWord.length].classList.add("current");
         }
         
         // Move indices past this word and the following space
@@ -485,5 +590,13 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Game initialized successfully");
     } catch (error) {
         console.error("Error initializing game:", error);
+    }
+});
+
+// Adjust container height when window is resized
+window.addEventListener("resize", () => {
+    if (!isGameActive) {
+        // Only adjust height when not actively typing
+        adjustContainerHeight();
     }
 });
